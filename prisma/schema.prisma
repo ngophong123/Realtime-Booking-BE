@@ -36,90 +36,91 @@ model User {
 }
 
 model Movie {
-  id  String  @id  @default(uuid())
-  title  String 
-  duration  Int       // Thời lượng phim (phút)
-  releaseDate  DateTime
-  posterUrl  String?
-  showtimes  Showtime[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id          String     @id @default(uuid())
+  title       String 
+  description String?
+  duration    Int        // Thời lượng phim (phút)
+  releaseDate DateTime
+  posterUrl   String?
+  showtimes   Showtime[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
 
 model Room {
-  id  String  @id @default(uuid())
-  name  String  @unique
-  rows  Int  
-  columns  Int
-  seats  Seat[]
-  showtimes  Showtime[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id        String     @id @default(uuid())
+  name      String     @unique
+  rows      Int  
+  columns   Int
+  seats     Seat[]
+  showtimes Showtime[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 }
 
 model Seat {
-  id  String  @id @default(uuid())
-  roomId  String 
-  room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  row  String          //Hàng ghế
-  column  Int      //Số ghế
-  label  String      //Tên ghế kết hợp
-  type  SeatType  @default(STANDARD)    //Loại ghế
-  bookingSeats  BookingSeat[]
-  seatHolds  SeatHold[]  
+  id           String        @id @default(uuid())
+  roomId       String 
+  room         Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  row          String        // Hàng ghế
+  column       Int           // Số ghế
+  label        String        // Tên ghế kết hợp
+  type         SeatType      @default(STANDARD) // Loại ghế
+  bookingSeats BookingSeat[]
+  seatHolds    SeatHold[]  
 
-  @@unique([roomId, row, column])     //Đảm bảo trong 1 phòng không thể có 2 ghế trùng hàng và cột
+  @@unique([roomId, row, column]) // Đảm bảo trong 1 phòng không thể có 2 ghế trùng hàng và cột
 }
 
 model Showtime {
-  id  String  @id @default(uuid())
-  movieId  String
-  movie  Movie  @relation(fields: [movieId], references: [id], onDelete: Cascade)
-  roomId  String
-  room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  startTime  DateTime
-  endTime  DateTime
-  price  Decimal  // Giá vé cơ bản cho suất chiếu này
+  id        String     @id @default(uuid())
+  movieId   String
+  movie     Movie      @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  roomId    String
+  room      Room       @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  startTime DateTime
+  endTime   DateTime
+  price     Decimal    // Giá vé cơ bản cho suất chiếu này
   bookings  Booking[]
-  seatHolds  SeatHold[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  seatHolds SeatHold[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 }
 
 model Booking {
-  id  String  @id @default(uuid())
-  userId  String
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  showtimeId  String
-  showtime  Showtime  @relation(fields: [ showtimeId], references: [id], onDelete: Cascade)
-  totalPrice  Decimal
-  status  BookingStatus  @default(PENDING)
-  bookingSeats  BookingSeat[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  showtimeId   String
+  showtime     Showtime      @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+  totalPrice   Decimal
+  status       BookingStatus @default(PENDING)
+  bookingSeats BookingSeat[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model BookingSeat {
-  id  String  @id @default(uuid())
-  bookingId  String
-  booking  Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  seatId  String
-  seat  Seat  @relation(fields: [seatId], references: [id], onDelete: Cascade)
-  price  Decimal    //Giá thực tế lúc bán (đã tính phụ thu VIP/Couple nếu có)
+  id        String   @id @default(uuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seatId    String
+  seat      Seat     @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  price     Decimal  // Giá thực tế lúc bán (đã tính phụ thu VIP/Couple nếu có)
 
   @@unique([bookingId, seatId])
 }
 
 model SeatHold {
-  id  String  @id @default(uuid())
-  showtimeId  String
-  showtime  Showtime  @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
-  seatId  String
-  seat  Seat  @relation(fields: [seatId], references: [id], onDelete: Cascade)
-  userId  String
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt  DateTime  @default(now())
-  expireAt  DateTime       // Thời gian hết hạn giữ ghế (ví dụ : createdAt + 5p)
+  id         String   @id @default(uuid())
+  showtimeId String
+  showtime   Showtime @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+  seatId     String
+  seat       Seat     @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  expireAt   DateTime // Thời gian hết hạn giữ ghế (ví dụ : createdAt + 5p)
   
   @@unique([showtimeId, seatId])
 }

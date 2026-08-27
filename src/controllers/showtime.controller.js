@@ -1,4 +1,4 @@
-const showtimeService = require("../services/showtime.service");
+﻿const showtimeService = require("../services/showtime.service");
 const jwt = require("jsonwebtoken");
 
 class ShowtimeController {
@@ -8,7 +8,7 @@ class ShowtimeController {
             const showtimes = await showtimeService.getAllShowtimes();
             return res.status(200).json({ showtimes });
         } catch (error) {
-            return res.status(500).json({ message: error.message });
+            return res.status(400).json({ message: error.message });
         }
     }
 
@@ -18,19 +18,29 @@ class ShowtimeController {
             const showtime = await showtimeService.getShowtimeById(id);
             return res.status(200).json({ showtime });
         } catch (error) {
-            return res.status(404).json({ message: error.message });
+            return res.status(400).json({ message: error.message });
         }
     }
 
     async create(req, res) {
         try {
             const { movieId, roomId, startTime, endTime, price } = req.body;
-            if( !movieId || !roomId || !startTime || !endTime || !price ) {
-                return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin suất chiếu!'})
+            if (!movieId || !roomId || !startTime || !endTime || !price) {
+                return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin suất chiếu!' });
             }
 
             const showtime = await showtimeService.createShowtime(req.body);
-            return res.status(201).json({ message: 'Tạo suất chiếu mới thành công!', showtime});
+            return res.status(201).json({ message: 'Tạo suất chiếu mới thành công!', showtime });
+        } catch (error) {
+            return res.status(400).json({ message: error.message });
+        }
+    }
+
+    async delete(req, res) {
+        try {
+            const { id } = req.params;
+            await showtimeService.deleteShowtime(id);
+            return res.status(200).json({ message: 'Xóa suất chiếu thành công!' });
         } catch (error) {
             return res.status(400).json({ message: error.message });
         }
@@ -38,7 +48,7 @@ class ShowtimeController {
 
     async getSeatMap(req, res) {
         try {
-            const {id} = req.params;
+            const { id } = req.params;
 
             let userId = null;
             if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
@@ -52,9 +62,8 @@ class ShowtimeController {
             }
             const seatMap = await showtimeService.getShowtimeSeatMap(id, userId);
             return res.status(200).json(seatMap);
-
         } catch (error) {
-            return res.status(400).json({message: error.message});
+            return res.status(400).json({ message: error.message });
         }
     }
 }

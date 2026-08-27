@@ -19,6 +19,40 @@ class BookingRepository {
         });
     }
 
+    async findRecentBooking(userId, showtimeId, seatIds) {
+        const fiveSecondsAgo = new Date(Date.now() - 10 * 1000);
+        return await prisma.booking.findFirst({
+            where: {
+                userId,
+                showtimeId,
+                status: 'CONFIRMED',
+                createdAt: {
+                    gte: fiveSecondsAgo,
+                },
+                seats: {
+                    some: {
+                        seatId: { in: seatIds }
+                    }
+                }
+            },
+            include: {
+                seats: { include: { seat: true } },
+                showtime: { include: { movie: true, room: true } },
+            }
+        });
+    }
+
+    async findById(id) {
+        return await prisma.booking.findUnique({
+            where: { id },
+            include: {
+                user: true,
+                showtime: { include: { movie: true, room: true } },
+                seats: { include: { seat: true } }
+            }
+        });
+    }
+
     async createBooking(userId, showtimeId, seatsData, totalPrice) {
         return await prisma.$transaction(async (tx) => {
             const booking = await tx.booking.create({
@@ -34,9 +68,7 @@ class BookingRepository {
                 bookingId: booking.id,
                 seatId: item.seatId,
                 price: item.price,
-            })
-                
-            );
+            }));
 
             await tx.bookingSeat.createMany({
                 data: bookingSeats,
@@ -46,7 +78,47 @@ class BookingRepository {
                 ...booking,
                 seats: bookingSeats,
             };
-    });
+        });
+    }
+
+    async cancelBooking(bookingId) {
+        return await prisma.$transaction(async (tx) => {
+            await tx.bookingSeat.deleteMany({
+                where: { bookingId }
+            });
+
+            const updatedBooking = await tx.booking.update({
+                where: { id: bookingId },
+                data: { status: 'CANCELLED' },
+                include: {
+                    showtime: { include: { movie: true, room: true } }
+                }
+            });
+
+            return updatedBooking;
+        });
+    }
+
+    async findAll(userId = null, isAdmin = false) {
+        const where = isAdmin ? {} : { userId };
+        return await prisma.booking.findMany({
+            where,
+            include: {
+                user: { select: { id: true, name: true, email: true } },
+                showtime: {
+                    include: {
+                        movie: true,
+                        room: true,
+                    }
+                },
+                seats: {
+                    include: {
+                        seat: true,
+                    }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
     }
 }
 

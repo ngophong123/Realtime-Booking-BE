@@ -1,4 +1,4 @@
-const prisma = require("../config/prisma");
+﻿const prisma = require("../config/prisma");
 
 class ShowtimeRepository {
     async findAll() {
@@ -8,7 +8,7 @@ class ShowtimeRepository {
                 room: true,
             },
             orderBy: { startTime: 'asc'},
-        })
+        });
     }
 
     async findById(id) {
@@ -17,12 +17,14 @@ class ShowtimeRepository {
             include: {
                 movie: true,
                 room: {
-                    include: {seats: {
-                        orderBy: [
-                            {row: 'asc'},
-                            {column: 'asc'},
-                        ]
-                    } }
+                    include: {
+                        seats: {
+                            orderBy: [
+                                { row: 'asc' },
+                                { column: 'asc' },
+                            ]
+                        }
+                    }
                 },
             },
         });
@@ -33,8 +35,8 @@ class ShowtimeRepository {
             where: {
                 roomId,
                 AND : [
-                    { startTime: { lt: endTime }},
-                    { endTime: { gt: startTime}},
+                    { startTime: { lt: endTime } },
+                    { endTime: { gt: startTime } },
                 ],
             },
         });
@@ -47,6 +49,12 @@ class ShowtimeRepository {
                 movie: true,
                 room: true,
             },
+        });
+    }
+
+    async delete(id) {
+        return await prisma.showtime.delete({
+            where: { id }
         });
     }
 
