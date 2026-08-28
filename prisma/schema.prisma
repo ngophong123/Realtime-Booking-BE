@@ -88,16 +88,19 @@ model Showtime {
 }
 
 model Booking {
-  id           String        @id @default(uuid())
-  userId       String
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  showtimeId   String
-  showtime     Showtime      @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
-  totalPrice   Decimal
-  status       BookingStatus @default(PENDING)
-  bookingSeats BookingSeat[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id             String        @id @default(uuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  showtimeId     String
+  showtime       Showtime      @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+  totalPrice     Decimal
+  discountAmount Decimal?      @default(0)
+  voucherCode    String?
+  paymentMethod  String?       @default("MOMO")
+  status         BookingStatus @default(PENDING)
+  bookingSeats   BookingSeat[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model BookingSeat {
@@ -123,4 +126,19 @@ model SeatHold {
   expireAt   DateTime // Thời gian hết hạn giữ ghế (ví dụ : createdAt + 5p)
   
   @@unique([showtimeId, seatId])
+}
+
+model Voucher {
+  id              String   @id @default(uuid())
+  code            String   @unique
+  discountPercent Int?     // Giảm % (ví dụ: 10 = 10%)
+  discountAmount  Decimal? // Giảm tiền mặt (ví dụ: 20000)
+  minOrderAmount  Decimal  @default(0)
+  maxDiscount     Decimal?
+  expireAt        DateTime
+  usageLimit      Int      @default(100)
+  usedCount       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

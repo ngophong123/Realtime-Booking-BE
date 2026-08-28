@@ -1,4 +1,4 @@
-﻿const prisma = require("../config/prisma");
+const prisma = require("../config/prisma");
 
 class ShowtimeRepository {
     async findAll() {
@@ -7,7 +7,7 @@ class ShowtimeRepository {
                 movie: true,
                 room: true,
             },
-            orderBy: { startTime: 'asc'},
+            orderBy: { startTime: 'asc' },
         });
     }
 
@@ -30,20 +30,33 @@ class ShowtimeRepository {
         });
     }
 
-    async findConflict(roomId, startTime, endTime) {
-        return await prisma.showtime.findFirst({
-            where: {
-                roomId,
-                AND : [
-                    { startTime: { lt: endTime } },
-                    { endTime: { gt: startTime } },
-                ],
-            },
-        });
+    async findConflict(roomId, startTime, endTime, excludeId = null) {
+        const where = {
+            roomId,
+            AND: [
+                { startTime: { lt: endTime } },
+                { endTime: { gt: startTime } },
+            ],
+        };
+        if (excludeId) {
+            where.id = { not: excludeId };
+        }
+        return await prisma.showtime.findFirst({ where });
     }
 
     async create(showtimeData) {
         return await prisma.showtime.create({
+            data: showtimeData,
+            include: {
+                movie: true,
+                room: true,
+            },
+        });
+    }
+
+    async update(id, showtimeData) {
+        return await prisma.showtime.update({
+            where: { id },
             data: showtimeData,
             include: {
                 movie: true,
