@@ -10,7 +10,8 @@ class RoomService {
     }
 
     async createRoom(roomData) {
-        const { name, rows, columns } = roomData;
+        const { name, rows, columns, type } = roomData;
+        const roomType = type || 'STANDARD';
         
         if (!name || rows <= 0 || columns <= 0) {
             throw new Error('Tên phòng, số hàng và số cột phải hợp lệ!');
@@ -24,29 +25,38 @@ class RoomService {
         for (let r = 0; r < rows; r++) {
             const rowLabel = String.fromCharCode(65 + r);
             for (let c = 1; c <= columns; c++) {
-                let defaultType = 'STANDARD';
-                // Hàng gần cuối thường là VIP, hàng cuối có thể là COUPLE nếu cấu hình
-                if (r >= Math.floor(rows / 2) && r < rows - 1) defaultType = 'VIP';
-                if (r === rows - 1) defaultType = 'COUPLE';
+                let defaultSeatType = 'STANDARD';
+
+                if (roomType === 'VIP') {
+                    defaultSeatType = 'VIP';
+                } else if (roomType === 'COUPLE') {
+                    defaultSeatType = 'COUPLE';
+                } else if (roomType === 'IMAX') {
+                    defaultSeatType = r < Math.floor(rows / 2) ? 'STANDARD' : 'VIP';
+                } else {
+                    // STANDARD room
+                    if (r >= Math.floor(rows / 2) && r < rows - 1) defaultSeatType = 'VIP';
+                    if (r === rows - 1) defaultSeatType = 'COUPLE';
+                }
 
                 seatList.push({
                     row: rowLabel,
                     column: c,
                     label: `${rowLabel}${c}`,
-                    type: defaultType,
+                    type: defaultSeatType,
                 });
             }
         }
 
-        return await roomRepository.createWithSeat(name, parseInt(rows), parseInt(columns), seatList);
+        return await roomRepository.createWithSeat(name, parseInt(rows), parseInt(columns), seatList, roomType);
     }
 
     async updateRoom(id, data) {
-        const { name } = data;
-        if (!name) {
-            throw new Error('Tên phòng chiếu không được để trống!');
-        }
-        return await roomRepository.updateRoom(id, name);
+        const updateData = {};
+        if (data.name) updateData.name = data.name.trim();
+        if (data.type) updateData.type = data.type;
+
+        return await roomRepository.updateRoom(id, updateData);
     }
 
     async updateSeatTypes(roomId, seatIds, type) {

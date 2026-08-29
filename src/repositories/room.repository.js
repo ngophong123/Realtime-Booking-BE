@@ -37,10 +37,15 @@ class RoomRepository {
         });
     }
 
-    async createWithSeat(name, rows, columns, seatsList) {
+    async createWithSeat(name, rows, columns, seatsList, roomType = 'STANDARD') {
         return await prisma.$transaction(async (tx) => {
             const room = await tx.room.create({
-                data: { name, rows, columns }
+                data: {
+                    name,
+                    rows,
+                    columns,
+                    type: roomType,
+                }
             });
 
             const seatsData = seatsList.map(seat => ({
@@ -55,10 +60,10 @@ class RoomRepository {
         });
     }
 
-    async updateRoom(id, name) {
+    async updateRoom(id, data) {
         return await prisma.room.update({
             where: { id },
-            data: { name }
+            data
         });
     }
 

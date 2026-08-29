@@ -9,6 +9,10 @@ const showtimeRoutes = require("./routes/showtime.routes");
 const bookingRoutes = require("./routes/booking.routes");
 const seatHoldRoutes = require("./routes/seathold.routes");
 const voucherRoutes = require("./routes/voucher.routes");
+const paymentRoutes = require("./routes/payment.routes");
+const notificationRoutes = require("./routes/notification.routes");
+const settingRoutes = require("./routes/setting.routes");
+const aiRoutes = require("./routes/ai.routes");
 
 const app = express();
 
@@ -27,6 +31,11 @@ app.use('/api/showtimes', showtimeRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/seathold', seatHoldRoutes);
 app.use('/api/vouchers', voucherRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/settings', settingRoutes);
+app.use('/api/ai', aiRoutes);
+
 app.use((req, res, next) => {
     res.status(404).json({ message: 'Đường dẫn API không tồn tại' });
 });

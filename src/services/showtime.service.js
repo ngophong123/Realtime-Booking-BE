@@ -1,6 +1,7 @@
 const showtimeRepository = require("../repositories/showtime.repository");
 const movieRepository = require("../repositories/movie.repository");
 const roomRepository = require("../repositories/room.repository");
+const prisma = require("../config/prisma");
 
 class ShowtimeService {
     async getAllShowtimes() {
@@ -54,6 +55,12 @@ class ShowtimeService {
             throw new Error('Phòng chiếu đã có suất chiếu khác trong khoảng thời gian này!');
         }
 
+        // Tự động chuyển trạng thái phim thành NOW_SHOWING (Đang chiếu)
+        await prisma.movie.update({
+            where: { id: movieId },
+            data: { status: 'NOW_SHOWING' },
+        });
+
         return await showtimeRepository.create({
             movieId,
             roomId,
@@ -75,6 +82,13 @@ class ShowtimeService {
         const conflict = await showtimeRepository.findConflict(roomId, start, end, id);
         if (conflict) {
             throw new Error('Phòng chiếu đã có suất chiếu khác trong khoảng thời gian này!');
+        }
+
+        if (movieId) {
+            await prisma.movie.update({
+                where: { id: movieId },
+                data: { status: 'NOW_SHOWING' },
+            });
         }
 
         return await showtimeRepository.update(id, {

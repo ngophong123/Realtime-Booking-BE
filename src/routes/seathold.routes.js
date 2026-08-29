@@ -4,6 +4,7 @@ const authMiddleware = require("../middlewares/auth.middleware");
 
 const router = express.Router();
 
+router.post('/hold', authMiddleware, seatHoldController.hold);
 router.post('/', authMiddleware, seatHoldController.hold);
 router.post('/release', authMiddleware, seatHoldController.release);
 

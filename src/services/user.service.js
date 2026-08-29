@@ -54,6 +54,42 @@ class UserService {
         const { password: _, ...userWithoutPassword } = user;
         return userWithoutPassword;
     }
+
+    async updateUserProfile(id, data) {
+        const user = await userRepository.findById(id);
+        if (!user) {
+            throw new Error('Không tìm thấy người dùng!');
+        }
+
+        const updateData = {};
+        if (data.name) updateData.name = data.name.trim();
+        if (data.email && data.email !== user.email) {
+            const existing = await userRepository.findByEmail(data.email);
+            if (existing && existing.id !== id) {
+                throw new Error('Email này đã được tài khoản khác sử dụng!');
+            }
+            updateData.email = data.email.trim();
+        }
+
+        if (data.newPassword && data.newPassword.trim() !== '') {
+            if (!data.currentPassword) {
+                throw new Error('Vui lòng nhập mật khẩu hiện tại để đổi mật khẩu mới!');
+            }
+            const isMatch = await bcrypt.compare(data.currentPassword, user.password);
+            if (!isMatch) {
+                throw new Error('Mật khẩu hiện tại không chính xác!');
+            }
+            updateData.password = await bcrypt.hash(data.newPassword, 10);
+        }
+
+        const updatedUser = await userRepository.update(id, updateData);
+        const { password: _, ...userWithoutPassword } = updatedUser;
+        return userWithoutPassword;
+    }
+
+    async getAllUsers() {
+        return await userRepository.findAll();
+    }
 }
 
 module.exports = new UserService();

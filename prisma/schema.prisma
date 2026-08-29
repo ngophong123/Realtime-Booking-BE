@@ -24,15 +24,17 @@ enum BookingStatus {
 }
 
 model User {
-  id        String     @id @default(uuid())
-  email     String     @unique
-  password  String
-  name      String
-  role      Role       @default(USER)
-  bookings  Booking[]
-  seatHolds SeatHold[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id            String         @id @default(uuid())
+  email         String         @unique
+  password      String
+  name          String
+  role          Role           @default(USER)
+  bookings      Booking[]
+  seatHolds     SeatHold[]
+  vouchers      Voucher[]
+  notifications Notification[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Movie {
@@ -42,6 +44,7 @@ model Movie {
   duration    Int        // Thời lượng phim (phút)
   releaseDate DateTime
   posterUrl   String?
+  status      String     @default("COMING_SOON") // NOW_SHOWING | COMING_SOON
   showtimes   Showtime[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -50,6 +53,7 @@ model Movie {
 model Room {
   id        String     @id @default(uuid())
   name      String     @unique
+  type      String     @default("STANDARD") // STANDARD | IMAX | COUPLE | VIP
   rows      Int  
   columns   Int
   seats     Seat[]
@@ -69,7 +73,7 @@ model Seat {
   bookingSeats BookingSeat[]
   seatHolds    SeatHold[]  
 
-  @@unique([roomId, row, column]) // Đảm bảo trong 1 phòng không thể có 2 ghế trùng hàng và cột
+  @@unique([roomId, row, column])
 }
 
 model Showtime {
@@ -109,7 +113,7 @@ model BookingSeat {
   booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   seatId    String
   seat      Seat     @relation(fields: [seatId], references: [id], onDelete: Cascade)
-  price     Decimal  // Giá thực tế lúc bán (đã tính phụ thu VIP/Couple nếu có)
+  price     Decimal  // Giá thực tế lúc bán
 
   @@unique([bookingId, seatId])
 }
@@ -123,7 +127,7 @@ model SeatHold {
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
-  expireAt   DateTime // Thời gian hết hạn giữ ghế (ví dụ : createdAt + 5p)
+  expireAt   DateTime
   
   @@unique([showtimeId, seatId])
 }
@@ -131,14 +135,47 @@ model SeatHold {
 model Voucher {
   id              String   @id @default(uuid())
   code            String   @unique
-  discountPercent Int?     // Giảm % (ví dụ: 10 = 10%)
-  discountAmount  Decimal? // Giảm tiền mặt (ví dụ: 20000)
+  discountPercent Int?     // Giảm %
+  discountAmount  Decimal? // Giảm tiền mặt
   minOrderAmount  Decimal  @default(0)
   maxDiscount     Decimal?
   expireAt        DateTime
   usageLimit      Int      @default(100)
   usedCount       Int      @default(0)
   isActive        Boolean  @default(true)
+  userId          String?  // Gán cho user cụ thể nếu được tặng
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model PaymentSetting {
+  id                String   @id @default(uuid())
+  momoQrUrl         String?
+  vietQrUrl         String?
+  zaloPayQrUrl      String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankName          String?
+  updatedAt         DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String?  // null dành cho Admin broadcast hoặc user cụ thể
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("INFO") // BOOKING, APPROVED, CANCELLED, VOUCHER, SYSTEM
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model EmailSetting {
+  id           String   @id @default(uuid())
+  smtpEmail    String?  // Gmail gửi thư
+  smtpPassword String?  // App Password Google
+  senderName   String?  @default("CINEVERSE Cinema")
+  adminEmail   String?  @default("admin@cineverse.vn")
+  updatedAt    DateTime @updatedAt
 }

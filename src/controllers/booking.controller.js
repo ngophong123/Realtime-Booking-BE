@@ -19,13 +19,14 @@ class BookingController {
                 showtimeId,
                 seatIds,
                 paymentMethod,
-                voucherCode
+                voucherCode,
+                req.user
             );
 
             // Phát sự kiện Realtime
             try {
                 const io = getIO();
-                // Khóa ghế vĩnh viễn trên sơ đồ của phòng chiếu này
+                // Khóa ghế trên sơ đồ của phòng chiếu này
                 io.to(`showtime:${showtimeId}`).emit('seat:booked', {
                     showtimeId,
                     seatIds,
@@ -51,6 +52,28 @@ class BookingController {
         }
     }
 
+    async approve(req, res) {
+        try {
+            const { id } = req.params;
+            const booking = await bookingService.approveBooking(id);
+
+            try {
+                const io = getIO();
+                io.emit('booking:approved', {
+                    bookingId: booking.id,
+                    userId: booking.userId,
+                    movieTitle: booking.showtime?.movie?.title,
+                });
+            } catch (socketError) {
+                console.error('Lỗi phát socket approve:', socketError.message);
+            }
+
+            return res.status(200).json({ message: 'Duyệt vé thành công! Đã gửi thông báo xác nhận qua email cho khách.', booking });
+        } catch (error) {
+            return res.status(400).json({ message: error.message });
+        }
+    }
+
     async cancel(req, res) {
         try {
             const { id } = req.params;
@@ -59,13 +82,11 @@ class BookingController {
             // Phát sự kiện Realtime giải phóng ghế
             try {
                 const io = getIO();
-                // 1. Mở lại ghế trên sơ đồ
                 io.to(`showtime:${result.showtimeId}`).emit('seat:released', {
                     showtimeId: result.showtimeId,
                     seatIds: result.seatIds,
                 });
 
-                // 2. Broadcast thông báo toàn hệ thống: Suất chiếu vừa có thêm ghế trống!
                 io.emit('showtime:seat_freed', {
                     showtimeId: result.showtimeId,
                     movieTitle: result.movieTitle,

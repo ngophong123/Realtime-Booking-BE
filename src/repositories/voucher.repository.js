@@ -3,6 +3,23 @@ const prisma = require("../config/prisma");
 class VoucherRepository {
     async findAll() {
         return await prisma.voucher.findMany({
+            include: {
+                user: { select: { id: true, name: true, email: true } }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+    }
+
+    async findByUser(userId) {
+        return await prisma.voucher.findMany({
+            where: {
+                isActive: true,
+                expireAt: { gt: new Date() },
+                OR: [
+                    { userId: null },
+                    { userId: userId },
+                ]
+            },
             orderBy: { createdAt: 'desc' }
         });
     }
