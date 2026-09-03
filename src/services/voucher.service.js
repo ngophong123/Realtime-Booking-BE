@@ -1,7 +1,8 @@
-const voucherRepository = require("../repositories/voucher.repository");
+﻿const voucherRepository = require("../repositories/voucher.repository");
 const userRepository = require("../repositories/user.repository");
 const emailService = require("./email.service");
 const notificationService = require("./notification.service");
+const { getIO } = require("../config/socket");
 
 class VoucherService {
     async getAllVouchers() {
@@ -42,6 +43,18 @@ class VoucherService {
             usageLimit: usageLimit ? Number(usageLimit) : 100,
             userId: userId || null,
         });
+
+        // Phát Socket thông báo
+        try {
+            const io = getIO();
+            if (userId) {
+                io.emit(`voucher:gifted:${userId}`, voucher);
+            } else {
+                io.emit('voucher:created', voucher);
+            }
+        } catch (e) {
+            console.error('Lỗi phát socket voucher:', e.message);
+        }
 
         // Nếu tặng cho khách hàng cụ thể thì gửi thông báo & email
         if (userId) {
@@ -99,6 +112,14 @@ class VoucherService {
             userId: targetUserId,
         });
 
+        // Phát Socket realtime trực tiếp tới user
+        try {
+            const io = getIO();
+            io.emit(`voucher:gifted:${targetUserId}`, voucher);
+        } catch (e) {
+            console.error('Lỗi phát socket voucher gift:', e.message);
+        }
+
         // 1. Tạo Notification cho User
         const discountText = voucher.discountPercent ? `giảm ${voucher.discountPercent}%` : `giảm ${Number(voucher.discountAmount).toLocaleString('vi-VN')}đ`;
         await notificationService.createNotification({
@@ -122,7 +143,12 @@ class VoucherService {
     }
 
     async deleteVoucher(id) {
-        return await voucherRepository.delete(id);
+        const deleted = await voucherRepository.delete(id);
+        try {
+            const io = getIO();
+            io.emit('voucher:deleted', { id });
+        } catch (e) {}
+        return deleted;
     }
 
     async validateAndApply(code, orderAmount, userId = null) {
