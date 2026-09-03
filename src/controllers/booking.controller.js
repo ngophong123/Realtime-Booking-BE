@@ -1,107 +1,143 @@
 const bookingService = require("../services/booking.service");
 const { getIO } = require("../config/socket");
+const bookingRepository = require("../repositories/booking.repository");
 
 class BookingController {
-    async getAll(req, res) {
+    constructor() {
+        this.createBooking = this.createBooking.bind(this);
+        this.approveBooking = this.approveBooking.bind(this);
+        this.cancelBooking = this.cancelBooking.bind(this);
+        this.getBookings = this.getBookings.bind(this);
+        this.getMyBookings = this.getMyBookings.bind(this);
+        this.getAllBookings = this.getAllBookings.bind(this);
+        
+        // Aliases
+        this.create = this.createBooking;
+        this.approve = this.approveBooking;
+        this.cancel = this.cancelBooking;
+        this.getAll = this.getBookings;
+    }
+
+    async createBooking(req, res) {
         try {
-            const bookings = await bookingService.getAllBookings(req.user.id, req.user.role);
+            const userId = req.user.id;
+            const { showtimeId, seatIds, voucherCode, paymentMethod, idempotencyKey } = req.body;
+            const user = req.user;
+
+            const reqMeta = {
+                ip: req.ip || req.connection?.remoteAddress || '127.0.0.1',
+                userAgent: req.headers['user-agent'] || '',
+            };
+
+            const booking = await bookingService.createBooking(
+                userId,
+                showtimeId,
+                seatIds,
+                voucherCode,
+                paymentMethod,
+                idempotencyKey || req.headers['idempotency-key'],
+                user,
+                reqMeta
+            );
+
+            // Emit socket event để cập nhật giao diện realtime
+            try {
+                const io = getIO();
+                io.to(showtimeId).emit('seats:booked', {
+                    showtimeId,
+                    seatIds,
+                    userId,
+                });
+            } catch (socketErr) {
+                console.warn('Socket emit warning:', socketErr.message);
+            }
+
+            return res.status(201).json({
+                message: 'Đặt vé thành công!',
+                booking,
+            });
+        } catch (error) {
+            return res.status(400).json({ message: error.message });
+        }
+    }
+
+    async approveBooking(req, res) {
+        try {
+            const { id } = req.params;
+            const approvedBooking = await bookingService.approveBooking(id);
+
+            return res.status(200).json({
+                message: 'Duyệt đơn vé thành công! Đã gửi thông báo và email xác nhận cho khách hàng.',
+                booking: approvedBooking,
+            });
+        } catch (error) {
+            return res.status(400).json({ message: error.message });
+        }
+    }
+
+    async cancelBooking(req, res) {
+        try {
+            const { id } = req.params;
+            const userId = req.user.id;
+            const userRole = req.user.role;
+
+            const result = await bookingService.cancelBooking(id, userId, userRole);
+
+            // Bắn realtime sự kiện ghế vừa được giải phóng
+            try {
+                const io = getIO();
+                io.to(result.showtimeId).emit('seats:freed', {
+                    showtimeId: result.showtimeId,
+                    seatIds: result.seatIds,
+                });
+
+                io.emit('seat:freed', {
+                    showtimeId: result.showtimeId,
+                    seatLabels: result.seatLabels,
+                    movieTitle: result.movieTitle,
+                    startTime: result.startTime,
+                    roomName: result.roomName,
+                });
+            } catch (socketErr) {
+                console.warn('Socket emit warning:', socketErr.message);
+            }
+
+            return res.status(200).json({
+                message: 'Hủy đơn đặt vé thành công!',
+                cancelledBooking: result.cancelledBooking,
+            });
+        } catch (error) {
+            return res.status(400).json({ message: error.message });
+        }
+    }
+
+    async getBookings(req, res) {
+        try {
+            const userId = req.user.id;
+            const isAdmin = req.user.role === 'ADMIN';
+            const bookings = await bookingRepository.findAll(isAdmin ? null : userId, isAdmin);
             return res.status(200).json({ bookings });
         } catch (error) {
             return res.status(500).json({ message: error.message });
         }
     }
 
-    async create(req, res) {
+    async getMyBookings(req, res) {
         try {
-            const { showtimeId, seatIds, paymentMethod, voucherCode } = req.body;
-            const booking = await bookingService.createBooking(
-                req.user.id,
-                showtimeId,
-                seatIds,
-                paymentMethod,
-                voucherCode,
-                req.user
-            );
-
-            // Phát sự kiện Realtime
-            try {
-                const io = getIO();
-                // Khóa ghế trên sơ đồ của phòng chiếu này
-                io.to(`showtime:${showtimeId}`).emit('seat:booked', {
-                    showtimeId,
-                    seatIds,
-                });
-
-                // Thông báo đơn hàng mới tức thì cho Admin
-                io.emit('admin:new_booking', {
-                    bookingId: booking.id,
-                    userName: req.user.name || 'Khách hàng',
-                    userEmail: req.user.email,
-                    movieTitle: booking.showtime?.movie?.title || 'Phim',
-                    seatCount: seatIds.length,
-                    totalPrice: booking.totalPrice,
-                    createdAt: new Date(),
-                });
-            } catch (socketError) {
-                console.error('Lỗi phát socket booking:', socketError.message);
-            }
-
-            return res.status(201).json({ message: 'Đặt vé và thanh toán thành công!', booking });
+            const userId = req.user.id;
+            const bookings = await bookingRepository.findAll(userId, false);
+            return res.status(200).json({ bookings });
         } catch (error) {
-            return res.status(400).json({ message: error.message });
+            return res.status(500).json({ message: error.message });
         }
     }
 
-    async approve(req, res) {
+    async getAllBookings(req, res) {
         try {
-            const { id } = req.params;
-            const booking = await bookingService.approveBooking(id);
-
-            try {
-                const io = getIO();
-                io.emit('booking:approved', {
-                    bookingId: booking.id,
-                    userId: booking.userId,
-                    movieTitle: booking.showtime?.movie?.title,
-                });
-            } catch (socketError) {
-                console.error('Lỗi phát socket approve:', socketError.message);
-            }
-
-            return res.status(200).json({ message: 'Duyệt vé thành công! Đã gửi thông báo xác nhận qua email cho khách.', booking });
+            const bookings = await bookingRepository.findAll(null, true);
+            return res.status(200).json({ bookings });
         } catch (error) {
-            return res.status(400).json({ message: error.message });
-        }
-    }
-
-    async cancel(req, res) {
-        try {
-            const { id } = req.params;
-            const result = await bookingService.cancelBooking(id, req.user.id, req.user.role);
-
-            // Phát sự kiện Realtime giải phóng ghế
-            try {
-                const io = getIO();
-                io.to(`showtime:${result.showtimeId}`).emit('seat:released', {
-                    showtimeId: result.showtimeId,
-                    seatIds: result.seatIds,
-                });
-
-                io.emit('showtime:seat_freed', {
-                    showtimeId: result.showtimeId,
-                    movieTitle: result.movieTitle,
-                    roomName: result.roomName,
-                    startTime: result.startTime,
-                    seatLabels: result.seatLabels,
-                    seatCount: result.seatIds.length,
-                });
-            } catch (socketError) {
-                console.error('Lỗi phát socket cancel:', socketError.message);
-            }
-
-            return res.status(200).json({ message: 'Hủy vé thành công! Ghế đã được mở lại cho khách khác.', booking: result.cancelledBooking });
-        } catch (error) {
-            return res.status(400).json({ message: error.message });
+            return res.status(500).json({ message: error.message });
         }
     }
 }

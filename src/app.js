@@ -13,6 +13,7 @@ const paymentRoutes = require("./routes/payment.routes");
 const notificationRoutes = require("./routes/notification.routes");
 const settingRoutes = require("./routes/setting.routes");
 const aiRoutes = require("./routes/ai.routes");
+const ticketRoutes = require("./routes/ticket.routes");
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use(express.json());
 app.get('/', (req, res) => {
     res.json({ message: 'Chào mừng đến với realtime-booking-system API' });
 });
+
 app.use('/api/auth', authRoutes);
 app.use('/api/movies', movieRoutes);
 app.use('/api/rooms', roomRoutes);
@@ -35,6 +37,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/settings', settingRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/tickets', ticketRoutes);
 
 app.use((req, res, next) => {
     res.status(404).json({ message: 'Đường dẫn API không tồn tại' });

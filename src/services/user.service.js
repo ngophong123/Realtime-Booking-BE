@@ -4,7 +4,8 @@ const userRepository = require('../repositories/user.repository');
 
 class UserService {
     async register(name, email, password) {
-        const existingUser = await userRepository.findByEmail(email);
+        const cleanEmail = email.trim().toLowerCase();
+        const existingUser = await userRepository.findByEmail(cleanEmail);
         if (existingUser) {
             throw new Error('Email đã được sử dụng');
         }
@@ -12,17 +13,28 @@ class UserService {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const newUser = await userRepository.create({
-            name,
-            email,
+            name: name.trim(),
+            email: cleanEmail,
             password: hashedPassword,
         });
+
+        const secret = process.env.JWT_SECRET || 'ahihihaha123';
+        const token = jwt.sign(
+            { id: newUser.id, role: newUser.role },
+            secret,
+            { expiresIn: '1d' }
+        );
          
         const { password: _, ...userWithoutPassword } = newUser;
-        return userWithoutPassword;
+        return {
+            user: userWithoutPassword,
+            token,
+        };
     }
 
     async loginUser(email, password) {
-        const user = await userRepository.findByEmail(email);
+        const cleanEmail = email.trim().toLowerCase();
+        const user = await userRepository.findByEmail(cleanEmail);
         if (!user) {
             throw new Error('Email hoặc mật khẩu không chính xác');
         }
@@ -64,11 +76,12 @@ class UserService {
         const updateData = {};
         if (data.name) updateData.name = data.name.trim();
         if (data.email && data.email !== user.email) {
-            const existing = await userRepository.findByEmail(data.email);
+            const cleanEmail = data.email.trim().toLowerCase();
+            const existing = await userRepository.findByEmail(cleanEmail);
             if (existing && existing.id !== id) {
                 throw new Error('Email này đã được tài khoản khác sử dụng!');
             }
-            updateData.email = data.email.trim();
+            updateData.email = cleanEmail;
         }
 
         if (data.newPassword && data.newPassword.trim() !== '') {

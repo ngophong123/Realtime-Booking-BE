@@ -13,7 +13,7 @@ class VoucherService {
     }
 
     async createVoucher(data) {
-        const { code, discountPercent, discountAmount, minOrderAmount, maxDiscount, expireAt, usageLimit, userId } = data;
+        const { code, discountPercent, discountAmount, minOrderAmount, maxDiscount, issueDate, expireAt, usageLimit, userId } = data;
         if (!code) {
             throw new Error('Vui lòng nhập mã Voucher!');
         }
@@ -23,16 +23,50 @@ class VoucherService {
             throw new Error('Mã Voucher này đã tồn tại trong hệ thống!');
         }
 
-        return await voucherRepository.create({
+        const now = new Date();
+        const start = issueDate ? (issueDate.includes('T') ? new Date(issueDate) : new Date(issueDate + 'T00:00:00.000Z')) : now;
+        const end = expireAt ? (expireAt.includes('T') ? new Date(expireAt) : new Date(expireAt + 'T23:59:59.999Z')) : new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+        if (end <= start) {
+            throw new Error('Ngày hết hạn phải sau ngày phát hành!');
+        }
+
+        const voucher = await voucherRepository.create({
             code,
             discountPercent: discountPercent ? Number(discountPercent) : null,
             discountAmount: discountAmount ? Number(discountAmount) : null,
             minOrderAmount: minOrderAmount ? Number(minOrderAmount) : 0,
             maxDiscount: maxDiscount ? Number(maxDiscount) : null,
-            expireAt: expireAt ? new Date(expireAt) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            issueDate: start,
+            expireAt: end,
             usageLimit: usageLimit ? Number(usageLimit) : 100,
             userId: userId || null,
         });
+
+        // Nếu tặng cho khách hàng cụ thể thì gửi thông báo & email
+        if (userId) {
+            const user = await userRepository.findById(userId);
+            if (user) {
+                const discountText = voucher.discountPercent ? `giảm ${voucher.discountPercent}%` : `giảm ${Number(voucher.discountAmount).toLocaleString('vi-VN')}đ`;
+                notificationService.createNotification({
+                    userId,
+                    title: '🎁 BẠN ĐƯỢC TẶNG VOUCHER MỚI!',
+                    message: `Ban quản trị vừa gửi tặng bạn mã Voucher "${code}" (${discountText}). Hạn sử dụng: ${new Date(end).toLocaleDateString('vi-VN')}.`,
+                    type: 'VOUCHER',
+                }).catch(() => {});
+
+                emailService.sendVoucherGiftAlert({
+                    userEmail: user.email,
+                    userName: user.name,
+                    voucherCode: code,
+                    discountPercent: voucher.discountPercent,
+                    discountAmount: voucher.discountAmount,
+                    expireAt: voucher.expireAt,
+                }).catch(() => {});
+            }
+        }
+
+        return voucher;
     }
 
     async giftVoucher(targetUserId, data) {
@@ -49,13 +83,18 @@ class VoucherService {
         const baseCode = data.code ? data.code.trim().toUpperCase() : 'GIFT';
         const code = `${baseCode}-${randomSuffix}`;
 
+        const now = new Date();
+        const start = data.issueDate ? (data.issueDate.includes('T') ? new Date(data.issueDate) : new Date(data.issueDate + 'T00:00:00.000Z')) : now;
+        const end = data.expireAt ? (data.expireAt.includes('T') ? new Date(data.expireAt) : new Date(data.expireAt + 'T23:59:59.999Z')) : new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+
         const voucher = await voucherRepository.create({
             code,
             discountPercent: data.discountPercent ? Number(data.discountPercent) : null,
             discountAmount: data.discountAmount ? Number(data.discountAmount) : 50000,
             minOrderAmount: data.minOrderAmount ? Number(data.minOrderAmount) : 0,
             maxDiscount: data.maxDiscount ? Number(data.maxDiscount) : null,
-            expireAt: data.expireAt ? new Date(data.expireAt) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            issueDate: start,
+            expireAt: end,
             usageLimit: 1,
             userId: targetUserId,
         });
@@ -100,7 +139,12 @@ class VoucherService {
             throw new Error('Mã Voucher này là quà tặng cá nhân dành riêng cho tài khoản khác!');
         }
 
-        if (new Date(voucher.expireAt) < new Date()) {
+        const now = new Date();
+        if (voucher.issueDate && new Date(voucher.issueDate) > now) {
+            throw new Error(`Mã Voucher này chưa đến thời gian áp dụng (Bắt đầu từ ${new Date(voucher.issueDate).toLocaleDateString('vi-VN')})!`);
+        }
+
+        if (new Date(voucher.expireAt) < now) {
             throw new Error('Mã Voucher đã hết hạn sử dụng!');
         }
 

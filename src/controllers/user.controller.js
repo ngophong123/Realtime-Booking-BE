@@ -7,10 +7,10 @@ class UserController {
             if (!name || !email || !password) {
                 return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin' });
             }
-            const user = await userService.register(name, email, password);
+            const result = await userService.register(name, email, password);
             return res.status(201).json({
                 message: 'Đăng ký tài khoản thành công',
-                user,
+                ...result,
             });
         } catch (error) {
             return res.status(400).json({ message: error.message });

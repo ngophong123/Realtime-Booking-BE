@@ -17,8 +17,9 @@ class NotificationService {
             const io = getIO();
             if (userId) {
                 io.emit(`notification:${userId}`, notif);
+            } else {
+                io.emit('notification:all', notif);
             }
-            io.emit('notification:all', notif);
         } catch (e) {
             console.error('Lỗi phát socket notification:', e.message);
         }

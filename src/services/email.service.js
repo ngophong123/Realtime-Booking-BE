@@ -4,13 +4,16 @@ const prisma = require("../config/prisma");
 class EmailService {
     async getTransporter() {
         let setting = await prisma.emailSetting.findFirst();
-        const user = setting?.smtpEmail || process.env.GMAIL_USER;
-        const pass = setting?.smtpPassword || process.env.GMAIL_APP_PASSWORD;
+        const user = setting?.smtpEmail?.trim() || process.env.GMAIL_USER;
+        let pass = setting?.smtpPassword ? setting.smtpPassword.replace(/\s+/g, '').trim() : process.env.GMAIL_APP_PASSWORD;
 
         if (user && pass) {
             return {
                 transporter: nodemailer.createTransport({
                     service: 'gmail',
+                    host: 'smtp.gmail.com',
+                    port: 465,
+                    secure: true,
                     auth: { user, pass },
                 }),
                 senderName: setting?.senderName || 'CINEVERSE Cinema',
@@ -33,10 +36,10 @@ class EmailService {
                     text: text || '',
                     html,
                 });
-                console.log(`[EMAIL THẬT GỬI THÀNH CÔNG GMAIL] To: ${to} | ID: ${info.messageId}`);
+                console.log(`[EMAIL GỬI THÀNH CÔNG GMAIL] To: ${to} | MessageId: ${info.messageId}`);
                 return { success: true, messageId: info.messageId };
             } else {
-                console.log('\n[CHƯA CẤU HÌNH GMAIL] Log mô phỏng Email:');
+                console.log('\n[CHƯA CẤU HÌNH GMAIL] Mô phỏng gửi Email:');
                 console.log(`To: ${to}`);
                 console.log(`Subject: ${subject}`);
                 console.log(`Nội dung: ${text || html?.replace(/<[^>]*>?/gm, '')}`);
@@ -50,8 +53,8 @@ class EmailService {
     }
 
     async sendAdminBookingAlert(data) {
-        let setting = await prisma.emailSetting.findFirst();
-        const adminTo = setting?.adminEmail || setting?.smtpEmail || process.env.GMAIL_USER || 'admin@cineverse.vn';
+        const config = await this.getTransporter();
+        const adminTo = config?.adminEmail || process.env.ADMIN_EMAIL || 'giolaptrinh@gmail.com';
 
         const subject = `🔔 ĐƠN ĐẶT VÉ MỚI CẦN DUYỆT - #${data.bookingId?.slice(0, 8).toUpperCase()}`;
         const html = `
@@ -140,9 +143,9 @@ class EmailService {
             to: targetEmail,
             subject: '✅ KIỂM TRA KẾT NỐI EMAIL CINEVERSE THÀNH CÔNG!',
             html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #fff; border-radius: 12px;">
-                    <h2 style="color: #00e676;">Kết Nối Gmail SMTP Thành Công!</h2>
-                    <p>Hệ thống gửi email của rạp CINEVERSE đã hoạt động hoàn hảo.</p>
+                <div style="font-family: Arial, sans-serif; padding: 24px; background: #0f172a; color: #fff; border-radius: 12px; border: 1px solid #00e676;">
+                    <h2 style="color: #00e676; margin-top: 0;">Kết Nối Gmail SMTP Thành Công!</h2>
+                    <p>Hệ thống gửi email thông báo của rạp CINEVERSE đã hoạt động hoàn hảo.</p>
                     <p style="color: #94a3b8; font-size: 12px;">Thời gian kiểm tra: ${new Date().toLocaleString('vi-VN')}</p>
                 </div>
             `,

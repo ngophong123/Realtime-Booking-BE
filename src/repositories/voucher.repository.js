@@ -14,7 +14,7 @@ class VoucherRepository {
         return await prisma.voucher.findMany({
             where: {
                 isActive: true,
-                expireAt: { gt: new Date() },
+                expireAt: { gte: new Date() },
                 OR: [
                     { userId: null },
                     { userId: userId },

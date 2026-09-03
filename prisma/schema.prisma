@@ -19,8 +19,13 @@ enum SeatType {
 
 enum BookingStatus {
   PENDING
+  HOLDING
+  PAID
   CONFIRMED
   CANCELLED
+  EXPIRED
+  FAILED
+  REFUNDED
 }
 
 model User {
@@ -33,6 +38,7 @@ model User {
   seatHolds     SeatHold[]
   vouchers      Voucher[]
   notifications Notification[]
+  paymentLogs   PaymentLog[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -102,7 +108,12 @@ model Booking {
   voucherCode    String?
   paymentMethod  String?       @default("MOMO")
   status         BookingStatus @default(PENDING)
+  idempotencyKey String?       @unique
+  ticketToken    String?       @unique // Token chữ ký số cho QR Check-in
+  isCheckedIn    Boolean       @default(false)
+  checkInAt      DateTime?
   bookingSeats   BookingSeat[]
+  paymentLogs    PaymentLog[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 }
@@ -133,20 +144,53 @@ model SeatHold {
 }
 
 model Voucher {
-  id              String   @id @default(uuid())
-  code            String   @unique
-  discountPercent Int?     // Giảm %
-  discountAmount  Decimal? // Giảm tiền mặt
-  minOrderAmount  Decimal  @default(0)
+  id              String    @id @default(uuid())
+  code            String    @unique
+  discountPercent Int?      // Giảm %
+  discountAmount  Decimal?  // Giảm tiền mặt
+  minOrderAmount  Decimal   @default(0)
   maxDiscount     Decimal?
-  expireAt        DateTime
-  usageLimit      Int      @default(100)
-  usedCount       Int      @default(0)
-  isActive        Boolean  @default(true)
-  userId          String?  // Gán cho user cụ thể nếu được tặng
-  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  issueDate       DateTime  @default(now()) // Ngày phát hành
+  expireAt        DateTime  // Ngày hết hạn
+  usageLimit      Int       @default(100)
+  usedCount       Int       @default(0)
+  isActive        Boolean   @default(true)
+  userId          String?   // Gán cho user cụ thể nếu được tặng
+  user            User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model PaymentLog {
+  id             String   @id @default(uuid())
+  bookingId      String?
+  booking        Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  orderId        String?
+  amount         Decimal?
+  currency       String   @default("VND")
+  paymentMethod  String?
+  statusBefore   String?
+  statusAfter    String?
+  ipAddress      String?
+  userAgent      String?
+  signature      String?
+  isVerified     Boolean  @default(false)
+  rawPayload     String?  @db.Text
+  checksum       String?
+  createdAt      DateTime @default(now())
+}
+
+model IdempotencyRecord {
+  id           String   @id @default(uuid())
+  key          String   @unique
+  userId       String?
+  path         String?
+  responseBody String?  @db.Text
+  statusCode   Int      @default(200)
+  createdAt    DateTime @default(now())
+  expireAt     DateTime
 }
 
 model PaymentSetting {
@@ -178,4 +222,19 @@ model EmailSetting {
   senderName   String?  @default("CINEVERSE Cinema")
   adminEmail   String?  @default("admin@cineverse.vn")
   updatedAt    DateTime @updatedAt
+}
+
+model FooterSetting {
+  id              String   @id @default(uuid())
+  termsOfService  String?  @db.Text
+  privacyPolicy   String?  @db.Text
+  customerCare    String?  @db.Text
+  aboutUs         String?  @db.Text
+  hotline         String?  @default("1900 8888")
+  email           String?  @default("support@cineverse.vn")
+  socialFacebook  String?  @default("https://facebook.com/cineverse")
+  socialYoutube   String?  @default("https://youtube.com/cineverse")
+  socialZalo      String?  @default("https://zalo.me/cineverse")
+  cancellationCutoffHours Int @default(12)
+  updatedAt       DateTime @updatedAt
 }

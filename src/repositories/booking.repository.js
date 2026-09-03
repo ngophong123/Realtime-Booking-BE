@@ -7,36 +7,15 @@ class BookingRepository {
                 seatId: { in: seatIds },
                 booking: {
                     showtimeId,
-                    status: 'CONFIRMED',
+                    status: { in: ['CONFIRMED', 'PAID', 'HOLDING'] },
                 },
             },
             include: { seat: true },
         });
     }
 
-    async findRecentBooking(userId, showtimeId, seatIds) {
-        const tenSecondsAgo = new Date(Date.now() - 10 * 1000);
-        return await prisma.booking.findFirst({
-            where: {
-                userId,
-                showtimeId,
-                status: 'CONFIRMED',
-                createdAt: { gte: tenSecondsAgo },
-                bookingSeats: {
-                    some: {
-                        seatId: { in: seatIds }
-                    }
-                }
-            },
-            include: {
-                bookingSeats: { include: { seat: true } },
-                showtime: { include: { movie: true, room: true } },
-            }
-        });
-    }
-
     async findById(id) {
-        return await prisma.booking.findUnique({
+        return await prisma.booking.findFirst({
             where: { id },
             include: {
                 user: true,
@@ -46,7 +25,19 @@ class BookingRepository {
         });
     }
 
-    async createBooking(userId, showtimeId, seatsData, totalPrice, discountAmount = 0, voucherCode = null, paymentMethod = 'MOMO') {
+    async findByIdempotencyKey(idempotencyKey) {
+        if (!idempotencyKey) return null;
+        return await prisma.booking.findUnique({
+            where: { idempotencyKey },
+            include: {
+                user: true,
+                showtime: { include: { movie: true, room: true } },
+                bookingSeats: { include: { seat: true } }
+            }
+        });
+    }
+
+    async createBooking(userId, showtimeId, seatsData, totalPrice, discountAmount = 0, voucherCode = null, paymentMethod = 'MOMO', idempotencyKey = null, ticketToken = null, status = 'CONFIRMED') {
         return await prisma.$transaction(async (tx) => {
             const booking = await tx.booking.create({
                 data: {
@@ -56,7 +47,9 @@ class BookingRepository {
                     discountAmount: discountAmount ? Number(discountAmount) : 0,
                     voucherCode: voucherCode ? voucherCode.toUpperCase() : null,
                     paymentMethod: paymentMethod || 'MOMO',
-                    status: 'CONFIRMED',
+                    status: status || 'CONFIRMED',
+                    idempotencyKey: idempotencyKey || null,
+                    ticketToken: ticketToken || null,
                 },
             });
 
@@ -81,6 +74,18 @@ class BookingRepository {
                 ...booking,
                 seats: bookingSeats,
             };
+        });
+    }
+
+    async updateStatus(bookingId, status) {
+        return await prisma.booking.update({
+            where: { id: bookingId },
+            data: { status },
+            include: {
+                user: true,
+                showtime: { include: { movie: true, room: true } },
+                bookingSeats: { include: { seat: true } }
+            }
         });
     }
 
