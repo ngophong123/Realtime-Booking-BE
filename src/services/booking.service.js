@@ -155,18 +155,26 @@ class BookingService {
 
             const seatLabels = seats.map((s) => s.label);
 
-            // 1. Tạo Notification cho Admin & User
-            notificationService.createNotification({
-                userId: null,
-                title: '🔔 ĐƠN ĐẶT VÉ MỚI!',
-                message: `${user.name || 'Khách'} vừa đặt ${seatIds.length} vé phim "${showtime.movie?.title}" (${seatLabels.join(', ')}). Tổng: ${finalTotalPrice.toLocaleString('vi-VN')}đ`,
-                type: 'BOOKING',
-            }).catch((err) => console.error('Lỗi tạo notif admin:', err.message));
+            // 1. Tạo Notification riêng biệt cho Ban Quản Trị (ADMIN)
+            const adminUsers = await prisma.user.findMany({
+                where: { role: 'ADMIN' },
+                select: { id: true, name: true, email: true }
+            }).catch(() => []);
 
+            for (const admin of adminUsers) {
+                notificationService.createNotification({
+                    userId: admin.id,
+                    title: '🔔 ĐƠN ĐẶT VÉ MỚI CẦN DUYỆT',
+                    message: `Khách hàng "${user.name || 'Khách'}" (${user.email}) vừa đặt ${seatIds.length} vé phim "${showtime.movie?.title}" (Ghế: ${seatLabels.join(', ')}). Tổng tiền: ${finalTotalPrice.toLocaleString('vi-VN')}đ. Vui lòng vào Admin Panel để duyệt đơn!`,
+                    type: 'ADMIN_BOOKING',
+                }).catch((err) => console.error('Lỗi tạo notif admin:', err.message));
+            }
+
+            // 2. Tạo Notification riêng cho Khách Hàng (Người mua vé)
             notificationService.createNotification({
                 userId: userId,
-                title: '⏳ ĐƠN VÉ ĐANG CHỜ DUYỆT',
-                message: `Bạn vừa đặt vé xem phim "${showtime.movie?.title}". Vui lòng chờ quản trị viên xác nhận!`,
+                title: '⏳ ĐẶT VÉ THÀNH CÔNG - ĐANG CHỜ DUYỆT',
+                message: `Bạn đã đặt thành công ${seatIds.length} vé xem phim "${showtime.movie?.title}" (Ghế: ${seatLabels.join(', ')}). Mã đơn: #${bookingResult.id.slice(0, 8).toUpperCase()}. Vui lòng chờ Ban Quản Trị xác nhận!`,
                 type: 'BOOKING',
             }).catch((err) => console.error('Lỗi tạo notif user:', err.message));
 

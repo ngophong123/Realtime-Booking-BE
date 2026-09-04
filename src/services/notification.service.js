@@ -30,6 +30,13 @@ class NotificationService {
     async getNotifications(userId, isAdmin = false) {
         if (isAdmin) {
             return await prisma.notification.findMany({
+                where: {
+                    OR: [
+                        { userId: userId },
+                        { userId: null },
+                        { type: 'ADMIN_BOOKING' }
+                    ]
+                },
                 orderBy: { createdAt: 'desc' },
                 take: 50,
             });
@@ -37,10 +44,8 @@ class NotificationService {
 
         return await prisma.notification.findMany({
             where: {
-                OR: [
-                    { userId: null },
-                    { userId: userId }
-                ]
+                userId: userId,
+                type: { not: 'ADMIN_BOOKING' }
             },
             orderBy: { createdAt: 'desc' },
             take: 30,
@@ -57,7 +62,14 @@ class NotificationService {
     async markAllAsRead(userId, isAdmin = false) {
         if (isAdmin) {
             return await prisma.notification.updateMany({
-                where: { isRead: false },
+                where: {
+                    isRead: false,
+                    OR: [
+                        { userId: userId },
+                        { userId: null },
+                        { type: 'ADMIN_BOOKING' }
+                    ]
+                },
                 data: { isRead: true }
             });
         }
@@ -65,7 +77,8 @@ class NotificationService {
         return await prisma.notification.updateMany({
             where: {
                 isRead: false,
-                OR: [{ userId: null }, { userId }]
+                userId: userId,
+                type: { not: 'ADMIN_BOOKING' }
             },
             data: { isRead: true }
         });

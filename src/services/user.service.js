@@ -1,6 +1,7 @@
 ﻿const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const userRepository = require('../repositories/user.repository');
+const notificationService = require('./notification.service');
 
 class UserService {
     async register(name, email, password) {
@@ -89,6 +90,7 @@ class UserService {
             }
         }
 
+        let isPasswordChanged = false;
         if (data.newPassword && data.newPassword.trim() !== '') {
             if (!data.currentPassword) {
                 throw new Error('Vui lòng nhập mật khẩu hiện tại để đổi mật khẩu mới!');
@@ -101,9 +103,23 @@ class UserService {
                 throw new Error('Mật khẩu mới phải có tối thiểu 6 ký tự!');
             }
             updateData.password = await bcrypt.hash(data.newPassword.trim(), 10);
+            isPasswordChanged = true;
         }
 
         const updatedUser = await userRepository.update(id, updateData);
+
+        // Tạo thông báo vào hộp thư & phát socket realtime
+        const updateDetailText = isPasswordChanged
+            ? 'Bạn vừa cập nhật thông tin hồ sơ và thay đổi mật khẩu thành công.'
+            : 'Thông tin tài khoản của bạn đã được lưu và cập nhật thành công.';
+
+        notificationService.createNotification({
+            userId: id,
+            title: '👤 CẬP NHẬT TÀI KHOẢN THÀNH CÔNG',
+            message: updateDetailText,
+            type: 'SYSTEM',
+        }).catch(() => {});
+
         const { password: _, ...userWithoutPassword } = updatedUser;
         return userWithoutPassword;
     }
