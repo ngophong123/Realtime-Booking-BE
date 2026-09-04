@@ -1,4 +1,4 @@
-const bcrypt = require("bcrypt");
+﻿const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const userRepository = require('../repositories/user.repository');
 
@@ -74,14 +74,19 @@ class UserService {
         }
 
         const updateData = {};
-        if (data.name) updateData.name = data.name.trim();
-        if (data.email && data.email !== user.email) {
+        if (data.name && data.name.trim() !== '') {
+            updateData.name = data.name.trim();
+        }
+
+        if (data.email && data.email.trim() !== '') {
             const cleanEmail = data.email.trim().toLowerCase();
-            const existing = await userRepository.findByEmail(cleanEmail);
-            if (existing && existing.id !== id) {
-                throw new Error('Email này đã được tài khoản khác sử dụng!');
+            if (cleanEmail !== user.email.toLowerCase()) {
+                const existing = await userRepository.findByEmail(cleanEmail);
+                if (existing && existing.id !== id) {
+                    throw new Error('Email này đã được tài khoản khác sử dụng!');
+                }
+                updateData.email = cleanEmail;
             }
-            updateData.email = cleanEmail;
         }
 
         if (data.newPassword && data.newPassword.trim() !== '') {
@@ -92,7 +97,10 @@ class UserService {
             if (!isMatch) {
                 throw new Error('Mật khẩu hiện tại không chính xác!');
             }
-            updateData.password = await bcrypt.hash(data.newPassword, 10);
+            if (data.newPassword.trim().length < 6) {
+                throw new Error('Mật khẩu mới phải có tối thiểu 6 ký tự!');
+            }
+            updateData.password = await bcrypt.hash(data.newPassword.trim(), 10);
         }
 
         const updatedUser = await userRepository.update(id, updateData);
